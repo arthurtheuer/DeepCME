@@ -1,7 +1,6 @@
 import numpy as np
 import seaborn as sns
 import pandas as pd
-import math
 import matplotlib.pyplot as plt
 
 plt.rcParams.update({
@@ -28,7 +27,7 @@ def barplot_err(x, y, yerr=None, legend_loc=0, data=None, ax=None, **kwargs):
             _data_i[y] = _row[y]
         _data.append(_data_i)
     _data = pd.concat(_data, ignore_index=True, sort=False)
-    _ax = sns.barplot(x=x, y=y, data=_data, ci='sd', ax=ax, **kwargs)
+    _ax = sns.barplot(x=x, y=y, data=_data, errorbar='sd', ax=ax, **kwargs)
     _ax.legend(loc=legend_loc, fontsize=12)
     # _ax.set_yscale("log")
     return _ax
@@ -142,7 +141,10 @@ def plot_validation_charts_function_separate(results_folder_path, func_names, ex
         dict3 = {"Function": func_names, "Estimate": np.array(exact_values),
                  "Error": None, "Estimator": "Exact"}
         df3 = pd.DataFrame(dict3)
-        df = pd.concat([df2, df1, df3])
+        df1 = df1.dropna(axis=1, how='all')
+        df2 = df2.dropna(axis=1, how='all')
+        df3 = df3.dropna(axis=1, how='all')
+        df = pd.concat([df2, df1, df3])  # dropped columns with all NaN values before concatenation
     else:
         filename = results_folder_path + "SimulationValidation_exact.txt"
         function_value_data = pd.read_csv(filename, delimiter=",",
@@ -227,7 +229,10 @@ def plot_validation_charts_sensitivity(results_folder_path, func_names, paramete
         if exact_sens_estimates is not None:
             f3 = sens_exact[["Parameter", func_names[i + 1], "Estimator"]]
             f3.insert(2, "Error", None)
-            df = pd.concat([f2, f1, f3])
+            f1 = f1.dropna(axis=1, how='all')
+            f2 = f2.dropna(axis=1, how='all')
+            f3 = f3.dropna(axis=1, how='all')
+            df = pd.concat([f2, f1, f3])  # dropped columns with all NaN values before concatenation
         else:
             f3 = sens_exact_mean[["Parameter", func_names[i + 1], "Estimator"]]
             stds = sens_exact_mean_std[func_names[i + 1]].to_numpy()
@@ -243,6 +248,7 @@ def plot_validation_charts_sensitivity(results_folder_path, func_names, paramete
             axs[i].set_ylabel("")
         axs[i].set_title(func_names[i + 1])
         if parameter_list:
+            axs[i].set_xticks(range(len(parameter_labels)))
             axs[i].set_xticklabels(parameter_labels, fontsize=20)
     if save_pdf:
         plt.savefig(results_folder_path + "Param_Sens.pdf", bbox_inches='tight', transparent="False", pad_inches=0)
