@@ -1,5 +1,5 @@
 import ReactionNetworkExamples as rxn_examples
-import tensorflow as tf
+import torch
 import CME_Solver as cme
 import simulation_validation as sim
 import plotting as plt_file
@@ -11,7 +11,7 @@ import data_saving as dts
 
 
 def main(argv):
-    tf.keras.backend.set_floatx("float64")
+    torch.set_default_dtype(torch.float64)
     config_filename = "./Configs/" + argv[1]
     print("The configuration file is: " + config_filename)
     config_file = open(config_filename, )
