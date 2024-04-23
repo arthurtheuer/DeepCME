@@ -1,6 +1,6 @@
 import numpy as np
 import ReactionNetworkClass as rxn
-import tensorflow as tf
+import torch
 import itertools
 from scipy.integrate import odeint
 
@@ -46,7 +46,7 @@ class independent_birth_death(rxn.ReactionNetworkDefinition):
         for elem in output_list_second_moment + output_list_cross_moments:
             output_list.append(elem)
 
-        return tf.stack(output_list, axis=1)
+        return torch.stack(output_list, axis=1)
 
     # here we compute the exact outputs and their sensitivities for this example
     def moment_eqn_sens(self, y, t):
@@ -121,7 +121,7 @@ class linear_signalling_cascade(rxn.ReactionNetworkDefinition):
         for elem in output_list_second_moment + output_list_cross_moments:
             output_list.append(elem)
 
-        return tf.stack(output_list, axis=1)
+        return torch.stack(output_list, axis=1)
 
     # here we compute the exact outputs and their sensitivities for this example
     def moment_eqn_sens(self, y, t):
@@ -242,7 +242,7 @@ class nonlinear_signalling_cascade(rxn.ReactionNetworkDefinition):
         for elem in output_list_second_moment + output_list_cross_moments:
             output_list.append(elem)
 
-        return tf.stack(output_list, axis=1)
+        return torch.stack(output_list, axis=1)
 
 
 class linear_signalling_cascade_with_feedback(rxn.ReactionNetworkDefinition):
@@ -294,7 +294,7 @@ class linear_signalling_cascade_with_feedback(rxn.ReactionNetworkDefinition):
         for elem in output_list_second_moment + output_list_cross_moments:
             output_list.append(elem)
 
-        return tf.stack(output_list, axis=1)
+        return torch.stack(output_list, axis=1)
 
 #
 # class birth_death_network(rxn.ReactionNetworkDefinition):
@@ -365,7 +365,7 @@ class linear_signalling_cascade_with_feedback(rxn.ReactionNetworkDefinition):
 #         for elem in output_list_second_moment + output_list_cross_moments:
 #             output_list.append(elem)
 #
-#         return tf.stack(output_list, axis=1)
+#         return torch.stack(output_list, axis=1)
 #
 #
 # class feedback_gene_expression_network(rxn.ReactionNetworkDefinition):
