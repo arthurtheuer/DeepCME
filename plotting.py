@@ -8,7 +8,7 @@ plt.rcParams.update({
     "text.usetex": True,
     "font.family": "sans-serif",
     "font.sans-serif": ["Helvetica"],
-    "text.latex.preamble": [r'\usepackage{amsfonts}'],
+    "text.latex.preamble": r'\usepackage{amsfonts}',
     'font.size': 15,
     "xtick.labelsize": 15,  # large tick labels
     "ytick.labelsize": 15,  # large tick labels
