@@ -1,6 +1,5 @@
 import numpy as np
 import ReactionNetworkClass as rxn
-import torch
 import itertools
 from scipy.integrate import odeint
 
@@ -39,7 +38,6 @@ class independent_birth_death(rxn.ReactionNetworkDefinition):
 
     # define output function
     def output_function(self, state):
-        state = torch.from_numpy(state)  # convert state to a PyTorch tensor
         output_list = [state[:, i] for i in self.output_species_indices]
         output_list_second_moment = [state[:, i] ** 2 for i in self.output_species_indices]
         output_list_cross_moments = [state[:, subset[0]] * state[:, subset[1]] for subset
@@ -47,7 +45,7 @@ class independent_birth_death(rxn.ReactionNetworkDefinition):
         for elem in output_list_second_moment + output_list_cross_moments:
             output_list.append(elem)
 
-        return torch.stack(output_list, dim=1)
+        return np.stack(output_list, axis=1)
 
     # here we compute the exact outputs and their sensitivities for this example
     def moment_eqn_sens(self, y, t):
@@ -122,7 +120,7 @@ class linear_signalling_cascade(rxn.ReactionNetworkDefinition):
         for elem in output_list_second_moment + output_list_cross_moments:
             output_list.append(elem)
 
-        return torch.stack(output_list, dim=1)
+        return np.stack(output_list, axis=1)
 
     # here we compute the exact outputs and their sensitivities for this example
     def moment_eqn_sens(self, y, t):
@@ -243,7 +241,7 @@ class nonlinear_signalling_cascade(rxn.ReactionNetworkDefinition):
         for elem in output_list_second_moment + output_list_cross_moments:
             output_list.append(elem)
 
-        return torch.stack(output_list, dim=1)
+        return np.stack(output_list, axis=1)
 
 
 class linear_signalling_cascade_with_feedback(rxn.ReactionNetworkDefinition):
@@ -295,7 +293,7 @@ class linear_signalling_cascade_with_feedback(rxn.ReactionNetworkDefinition):
         for elem in output_list_second_moment + output_list_cross_moments:
             output_list.append(elem)
 
-        return torch.stack(output_list, dim=1)
+        return np.stack(output_list, axis=1)
 
 #
 # class birth_death_network(rxn.ReactionNetworkDefinition):
@@ -366,7 +364,7 @@ class linear_signalling_cascade_with_feedback(rxn.ReactionNetworkDefinition):
 #         for elem in output_list_second_moment + output_list_cross_moments:
 #             output_list.append(elem)
 #
-#         return torch.stack(output_list, dim=1)
+#         return np.stack(output_list, axis=1)
 #
 #
 # class feedback_gene_expression_network(rxn.ReactionNetworkDefinition):
