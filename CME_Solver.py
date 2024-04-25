@@ -1,20 +1,22 @@
 import time
 import numpy as np
-import tensorflow as tf
+import torch
+import torch.nn as nn
+import torch.nn.functional as F
+import torch.optim as optim
 import data_saving as dts
+
+from torch.optim.lr_scheduler import MultiStepLR
 
 
 class CMESolver(object):
     """The fully connected neural network model."""
 
     def __init__(self, network, config_data):
+        super(CMESolver, self).__init__()
         self.network = network
         self.config_data = config_data
-        lr_schedule = tf.keras.optimizers.schedules.PiecewiseConstantDecay(
-            config_data['net_config']['lr_boundaries'], config_data['net_config']['lr_values'])
-        self.optimizer = tf.keras.optimizers.Adam(learning_rate=lr_schedule, epsilon=1e-8)
-        self.total_num_simulated_trajectories = self.config_data['net_config']['valid_size'] \
-                                                + self.config_data['net_config']['batch_size']
+
         # create data for training and validation..unless it is already available
         if config_data['net_config']['training_samples_needed'] == "True":
             start_time = time.time()
@@ -57,16 +59,23 @@ class CMESolver(object):
 
         # set initial values for functions
         times, states_trajectories, martingale_trajectories = self.training_data
-        yvals = self.network.output_function(states_trajectories[:, -1, :])
-        y0 = tf.reduce_mean(yvals, axis=0)
+        yvals = torch.from_numpy(self.network.output_function(states_trajectories[:, -1, :]))  # convert to tensor
+        y0 = torch.mean(yvals, dim=0)
         # set func_clipping_thresholds
-        self.delta_clip = np.ones(shape=[self.network.output_function_size], dtype="float64") + \
-                          tf.math.reduce_mean(yvals, axis=0) + 2 * tf.math.reduce_std(yvals, axis=0)
+        self.delta_clip = torch.ones_like(y0) + torch.mean(yvals, dim=0) + 2 * torch.std(yvals, dim=0).detach().numpy()
+        #self.delta_clip = np.ones(shape=[self.network.output_function_size], dtype="float64") + torch.mean(yvals, dim=0) + 2 * torch.std(yvals, dim=0)
         self.model = NonsharedModel(network, config_data, y0, self.delta_clip)
         if config_data['net_config']['use_previous_training_weights'] == "True":
             filename = config_data['reaction_network_config']['output_folder'] + "/" + "trained_weights"
-            self.model.load_weights(filename)
+            self.model.load_state_dict(torch.load(filename))
         self.y_init = self.model.y_init
+
+        # set up optimizer and learning rate scheduler
+        lr_boundaries = config_data['net_config']['lr_boundaries']
+        lr_values = config_data['net_config']['lr_values']
+        self.optimizer = optim.Adam(self.model.parameters(), lr=lr_values[0], eps=1e-8)
+        self.scheduler = MultiStepLR(self.optimizer, milestones=lr_boundaries, gamma=lr_values[1] / lr_values[0])
+        self.total_num_simulated_trajectories = self.config_data['net_config']['valid_size'] + self.config_data['net_config']['batch_size']
 
     def train(self):
         start_time = time.time()
@@ -81,8 +90,8 @@ class CMESolver(object):
         for step in range(1, num_iterations + 1):
             self.train_step(self.training_data)
             if step % logging_frequency == 0:
-                loss = self.loss_fn(self.valid_data, training=False).numpy()
-                y_init = self.y_init.numpy()
+                loss = self.loss_fn(self.valid_data, training=False).detach().numpy()
+                y_init = self.y_init.detach().numpy()
                 elapsed_time = time.time() - start_time + self.validation_data_cpu_time + self.training_data_cpu_time
                 training_history.append([step, loss, elapsed_time])
                 function_value_data.append(y_init)
@@ -102,22 +111,24 @@ class CMESolver(object):
     def loss_fn(self, inputs, training):
         times, states_trajectories, martingale_trajectories = inputs
         y_terminal = self.model(inputs, training)
-        y_comp = self.network.output_function(states_trajectories[:, -1, :])
+        y_comp = torch.from_numpy(self.network.output_function(states_trajectories[:, -1, :]))  # convert to tensor
         delta = (y_terminal - y_comp) / self.delta_clip
-        loss = tf.reduce_mean(tf.where(tf.abs(delta) < 1, tf.square(delta), 2 * tf.abs(delta) - 1), axis=0)
-        return tf.reduce_sum(loss)
+        loss = torch.mean(torch.where(torch.abs(delta) < 1, torch.square(delta), 2 * torch.abs(delta) - 1), dim=0)
+        return torch.sum(loss)
 
-    def grad(self, inputs, training):
-        with tf.GradientTape(persistent=True) as tape:
-            loss = self.loss_fn(inputs, training)
-        grad = tape.gradient(loss, self.model.trainable_variables)
-        del tape
-        return grad
+    # def grad(self, inputs, training):
+    #     with tf.GradientTape(persistent=True) as tape:
+    #         loss = self.loss_fn(inputs, training)
+    #     grad = tape.gradient(loss, self.model.trainable_variables)
+    #     del tape
+    #     return grad
 
-    @tf.function
     def train_step(self, train_data):
-        grad = self.grad(train_data, training=True)
-        self.optimizer.apply_gradients(zip(grad, self.model.trainable_variables))
+        self.optimizer.zero_grad()
+        loss = self.loss_fn(train_data, training=True)
+        loss.backward()
+        self.optimizer.step()
+        self.scheduler.step()
 
     def estimate_parameter_sensitivities(self):
         times, states_trajectories, martingale_trajectories = self.training_data
@@ -125,7 +136,7 @@ class CMESolver(object):
                                                      training=False)
 
 
-class NonsharedModel(tf.keras.Model):
+class NonsharedModel(nn.Module):
 
     def __init__(self, network, config_data, y0, delta_clip):
         super(NonsharedModel, self).__init__()
@@ -135,85 +146,76 @@ class NonsharedModel(tf.keras.Model):
         self.num_exponential_features = config_data['net_config']['num_exponential_features']
         self.num_temporal_dnns = config_data['net_config']['num_temporal_dnns']
         self.num_time_samples = config_data['reaction_network_config']['num_time_interval']
-        self.y_init = tf.Variable(y0)
-        self.eigval_real = tf.Variable(-np.random.uniform(0, 1, size=[1, self.num_exponential_features]),
-                                       dtype="float64")
-        self.eigval_imag = tf.Variable(np.zeros([1, self.num_exponential_features], dtype="float64"))
-        self.eigval_phase = tf.Variable(np.zeros([1, self.num_exponential_features], dtype="float64"))
+        self.y_init = nn.Parameter(y0)
+        self.eigval_real = nn.Parameter(torch.rand(1, self.num_exponential_features, dtype=torch.float64))
+        self.eigval_imag = nn.Parameter(torch.zeros(1, self.num_exponential_features, dtype=torch.float64))
+        self.eigval_phase = nn.Parameter(torch.zeros(1, self.num_exponential_features, dtype=torch.float64))
         self.subnet = [FeedForwardSubNet(self.network.num_reactions, self.network.output_function_size, config_data)
                        for _ in range(self.num_temporal_dnns)]
 
-    def call(self, inputs, training):
+    def forward(self, inputs, training):
         times, states_trajectories, martingale_trajectories = inputs
-        batch_size = tf.shape(martingale_trajectories)[0]
-        all_one_vec = tf.ones(shape=tf.stack([batch_size, 1]), dtype="float64")
-        y = tf.matmul(all_one_vec, self.y_init[None, :])
+        states_trajectories = torch.from_numpy(states_trajectories)
+        martingale_trajectories = torch.from_numpy(martingale_trajectories)
+        batch_size = martingale_trajectories.shape[0]
+        all_one_vec = torch.ones(batch_size, 1, dtype=torch.float64)
+        y = torch.matmul(all_one_vec, self.y_init.unsqueeze(0))
         for t in range(0, self.num_time_samples - 1):
             time_left = self.stop_time - times[t]
             temporal_dnn = int(t * self.num_temporal_dnns / self.num_time_samples)
-            features_real = tf.reshape(tf.tile(tf.exp(self.eigval_real * time_left), [batch_size, 1]),
-                                       [batch_size, self.num_exponential_features])
-            features_imag = tf.reshape(
-                tf.tile(tf.sin(self.eigval_imag * time_left + self.eigval_phase), [batch_size, 1]),
-                [batch_size, self.num_exponential_features])
-            inputs = tf.stack(tf.unstack(states_trajectories[:, t, :], axis=-1)
-                              + tf.unstack(features_real, axis=-1) + tf.unstack(features_imag, axis=-1), axis=1)
+            features_real = torch.tile(torch.exp(self.eigval_real * time_left), [batch_size, 1])
+            features_imag = torch.sin(self.eigval_imag * time_left + self.eigval_phase).repeat(batch_size, 1)
+            inputs = torch.stack(torch.unbind(states_trajectories[:, t, :], dim=-1) + torch.unbind(features_real, dim=-1) + torch.unbind(features_imag, dim=-1), dim=1)
             z = self.subnet[temporal_dnn](inputs, training)
-            z = tf.reshape(z, shape=[batch_size, self.network.output_function_size,
-                                     self.network.num_reactions])
-            martingale_increment = tf.expand_dims(martingale_trajectories[:, t + 1, :]
-                                                  - martingale_trajectories[:, t, :], axis=1)
-            y = y + tf.reduce_sum(z * martingale_increment, axis=2)
+            z = z.view(batch_size, self.network.output_function_size, self.network.num_reactions)
+            martingale_increment = martingale_trajectories[:, t + 1, :] - martingale_trajectories[:, t, :]
+            martingale_increment = martingale_increment.unsqueeze(1)
+            y = y + torch.sum(z * martingale_increment, dim=2)
+
         return y
 
     def compute_parameter_jacobian(self, states_trajectories, times, num_params, training):
-        batch_size = tf.shape(states_trajectories)[0]
-        jacobian = tf.zeros(shape=tf.stack([batch_size, num_params, self.network.output_function_size]),
-                            dtype="float64")
+        states_trajectories = torch.from_numpy(states_trajectories)
+        batch_size = states_trajectories.shape[0]
+        jacobian = torch.zeros(batch_size, num_params, self.network.output_function_size)
         for t in range(0, self.num_time_samples - 1):
             time_left = self.stop_time - times[t]
             temporal_dnn = int(t * self.num_temporal_dnns / self.num_time_samples)
-            features_real = tf.reshape(tf.tile(tf.exp(self.eigval_real * time_left), [batch_size, 1]),
-                                       [batch_size, self.num_exponential_features])
-            features_imag = tf.reshape(
-                tf.tile(tf.sin(self.eigval_imag * time_left + self.eigval_phase), [batch_size, 1]),
-                [batch_size, self.num_exponential_features])
-
-            inputs = tf.stack(tf.unstack(states_trajectories[:, t, :], axis=-1)
-                              + tf.unstack(features_real, axis=-1) + tf.unstack(features_imag, axis=-1), axis=1)
+            features_real = torch.tile(torch.exp(self.eigval_real * time_left), [batch_size, 1])
+            features_imag = torch.sin(self.eigval_imag * time_left + self.eigval_phase).repeat(batch_size, 1)
+            inputs = torch.stack(torch.unbind(states_trajectories[:, t, :], dim=-1) + torch.unbind(features_real, dim=-1) + torch.unbind(features_imag, dim=-1), dim=1)
             z = self.subnet[temporal_dnn](inputs, training)
-            z = tf.reshape(z, shape=[batch_size, self.network.output_function_size,
-                                     self.network.num_reactions])
-            propensity_jacobian = tf.stack([self.network.propensity_sensitivity_matrix(states_trajectories[i, t, :])
-                                            for i in range(states_trajectories[:, t, :].shape[0])], axis=0)
-            jacobian = jacobian + tf.matmul(propensity_jacobian, z, transpose_b=True) * (times[t + 1] - times[t])
-        return tf.reduce_mean(jacobian, axis=0)
+            z = z.view(batch_size, self.network.output_function_size, self.network.num_reactions)
+            propensity_jacobian = torch.stack([torch.from_numpy(self.network.propensity_sensitivity_matrix(states_trajectories[i, t, :]))
+                                               for i in range(states_trajectories[:, t, :].size(0))], dim=0)
+            jacobian = jacobian + torch.matmul(propensity_jacobian, z.transpose(1, 2)) * (times[t + 1] - times[t])
+        return torch.mean(jacobian, dim=0)
 
 
-class FeedForwardSubNet(tf.keras.Model):
-    def get_config(self):
-        pass
-
+class FeedForwardSubNet(nn.Module):
     def __init__(self, num_reactions, output_function_size, config_data):
         super(FeedForwardSubNet, self).__init__()
-        num_hiddens = config_data['net_config']['num_nodes_per_layer']
-        num_layers = config_data['net_config']['num_hidden_layers']
-        self.dense_layers = [tf.keras.layers.Dense(num_hiddens,
-                                                   use_bias=True,
-                                                   activation=config_data['net_config']['activation_function'],
-                                                   kernel_initializer='zeros',
-                                                   bias_initializer='zeros')
-                             for _ in range(num_layers)]
-        # final output should be a value of dimension num_reactions*output_function_size
-        self.dense_layers.append(tf.keras.layers.Dense(num_reactions * output_function_size,
-                                                       use_bias=True, activation=None,
-                                                       kernel_initializer='zeros',
-                                                       bias_initializer='zeros'))
+        num_hiddens = config_data['net_config']['num_nodes_per_layer']  # 4
+        num_layers = config_data['net_config']['num_hidden_layers']  # 2
+        num_species = config_data['reaction_network_config']['num_species']  # 10
+        num_exp_features = config_data['net_config']['num_exponential_features']  # 1
 
-    def call(self, x, training):
-        for i in range(len(self.dense_layers) - 1):
-            x = self.dense_layers[i](x)
-        x = self.dense_layers[-1](x)
+        # Define the hidden layers and add them to a ModuleList
+        self.layers = nn.ModuleList([nn.Linear(num_species + 2*num_exp_features, num_hiddens)])  # put first layer into module list
+        self.layers.extend([nn.Linear(num_hiddens, num_hiddens) for _ in range(num_layers - 1)])  # add the hidden layers
+        self.final_layer = nn.Linear(num_hiddens, num_reactions * output_function_size)
+
+        # Initialize weights and biases
+        for layer in self.layers:
+            nn.init.zeros_(layer.weight)
+            nn.init.zeros_(layer.bias)
+        nn.init.zeros_(self.final_layer.weight)
+        nn.init.zeros_(self.final_layer.bias)
+
+    def forward(self, x, training):
+        for layer in self.layers:
+            x = F.relu(layer(x))
+        x = self.final_layer(x)
         return x
 
 
