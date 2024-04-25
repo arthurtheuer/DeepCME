@@ -34,7 +34,7 @@ def main(argv):
         # save the sensitivity matrix in a file
         dts.save_sensitivity_data(results_folder_path, dnn_sens_matrix, list(network.parameter_dict.keys()))
         # save the model weights
-        cme_solver.model.save_weights(results_folder_path + "trained_weights")
+        torch.save(cme_solver.model.state_dict(), results_folder_path + "trained_model")
 
     # simulation based validation
     if config_data['simulation_validation']['simulation_based_validation_needed'] == "True":
