@@ -58,10 +58,10 @@ class CMESolver(object):
         # set initial values for functions
         times, states_trajectories, martingale_trajectories = self.training_data
         yvals = self.network.output_function(states_trajectories[:, -1, :])
-        y0 = tf.reduce_mean(yvals, axis=0)
+        y0 = np.mean(yvals, axis=0)
         # set func_clipping_thresholds
         self.delta_clip = np.ones(shape=[self.network.output_function_size], dtype="float64") + \
-                          tf.math.reduce_mean(yvals, axis=0) + 2 * tf.math.reduce_std(yvals, axis=0)
+                          np.mean(yvals, axis=0) + 2 * np.std(yvals, axis=0)
         self.model = NonsharedModel(network, config_data, y0, self.delta_clip)
         if config_data['net_config']['use_previous_training_weights'] == "True":
             filename = config_data['reaction_network_config']['output_folder'] + "/" + "trained_weights"
@@ -102,7 +102,7 @@ class CMESolver(object):
     def loss_fn(self, inputs, training):
         times, states_trajectories, martingale_trajectories = inputs
         y_terminal = self.model(inputs, training)
-        y_comp = self.network.output_function(states_trajectories[:, -1, :])
+        y_comp = self.network.output_tf(states_trajectories[:, -1, :])
         delta = (y_terminal - y_comp) / self.delta_clip
         loss = tf.reduce_mean(tf.where(tf.abs(delta) < 1, tf.square(delta), 2 * tf.abs(delta) - 1), axis=0)
         return tf.reduce_sum(loss)

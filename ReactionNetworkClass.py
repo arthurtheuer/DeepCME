@@ -393,7 +393,7 @@ class ReactionNetworkDefinition(object):
                         rate = jac_abs * delta_t
                         prob = min(rate / normalisation_constant, 1)
                         if np.random.uniform(0, 1) < prob:
-                            sample_value[i, :] += (jac_sign * rate / prob) * self.BPA_generate_rtc_difference_sample \
+                            sample_value[i, :] = np.expand_dims(sample_value[i, :], axis=0) + (jac_sign * rate / prob) * self.BPA_generate_rtc_difference_sample \
                                 (state_curr, state2, stop_time - t + delta_t * np.random.uniform(0, 1))
             state_curr = self.update_state(next_reaction, state_curr)
             unit_poisson_jump_times[next_reaction] += -np.log(np.random.uniform(0, 1))

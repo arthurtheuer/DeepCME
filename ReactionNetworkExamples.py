@@ -46,6 +46,17 @@ class independent_birth_death(rxn.ReactionNetworkDefinition):
         for elem in output_list_second_moment + output_list_cross_moments:
             output_list.append(elem)
 
+        return np.stack(output_list, axis=1)
+    
+    # define second function
+    def output_tf(self, state):
+        output_list = [state[:, i] for i in self.output_species_indices]
+        output_list_second_moment = [state[:, i] ** 2 for i in self.output_species_indices]
+        output_list_cross_moments = [state[:, subset[0]] * state[:, subset[1]] for subset
+                                     in itertools.combinations(self.output_species_indices, 2)]
+        for elem in output_list_second_moment + output_list_cross_moments:
+            output_list.append(elem)
+
         return tf.stack(output_list, axis=1)
 
     # here we compute the exact outputs and their sensitivities for this example
@@ -121,7 +132,7 @@ class linear_signalling_cascade(rxn.ReactionNetworkDefinition):
         for elem in output_list_second_moment + output_list_cross_moments:
             output_list.append(elem)
 
-        return tf.stack(output_list, axis=1)
+        return np.stack(output_list, axis=1)
 
     # here we compute the exact outputs and their sensitivities for this example
     def moment_eqn_sens(self, y, t):
@@ -242,7 +253,7 @@ class nonlinear_signalling_cascade(rxn.ReactionNetworkDefinition):
         for elem in output_list_second_moment + output_list_cross_moments:
             output_list.append(elem)
 
-        return tf.stack(output_list, axis=1)
+        return np.stack(output_list, axis=1)
 
 
 class linear_signalling_cascade_with_feedback(rxn.ReactionNetworkDefinition):
@@ -294,7 +305,7 @@ class linear_signalling_cascade_with_feedback(rxn.ReactionNetworkDefinition):
         for elem in output_list_second_moment + output_list_cross_moments:
             output_list.append(elem)
 
-        return tf.stack(output_list, axis=1)
+        return np.stack(output_list, axis=1)
 
 #
 # class birth_death_network(rxn.ReactionNetworkDefinition):
@@ -365,7 +376,7 @@ class linear_signalling_cascade_with_feedback(rxn.ReactionNetworkDefinition):
 #         for elem in output_list_second_moment + output_list_cross_moments:
 #             output_list.append(elem)
 #
-#         return tf.stack(output_list, axis=1)
+#         return np.stack(output_list, axis=1)
 #
 #
 # class feedback_gene_expression_network(rxn.ReactionNetworkDefinition):
