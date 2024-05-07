@@ -17,43 +17,43 @@ class CMESolver(object):
                                                 + self.config_data['net_config']['batch_size']
         # create data for training and validation..unless it is already available
         if config_data['net_config']['training_samples_needed'] == "True":
-            start_time = time.time()
+#            start_time = time.time()
             self.training_data = self.network.generate_sampled_rtc_trajectories(
                 self.config_data['reaction_network_config']['final_time'],
                 self.config_data['reaction_network_config']['num_time_interval'],
                 self.config_data['net_config']['batch_size'])
-            self.training_data_cpu_time = (time.time() - start_time)
-            print("Time needed to generate training trajectories: %3u" % self.training_data_cpu_time)
+#            self.training_data_cpu_time = (time.time() - start_time)
+#            print("Time needed to generate training trajectories: %3u" % self.training_data_cpu_time)
             dts.save_sampled_trajectories(config_data['reaction_network_config']['output_folder'] + "/",
                                           self.training_data, sample_type="training")
-            dts.save_cpu_time(config_data['reaction_network_config']['output_folder'] + "/", self.training_data_cpu_time
-                              , training=True)
+#            dts.save_cpu_time(config_data['reaction_network_config']['output_folder'] + "/", self.training_data_cpu_time
+#                              , training=True)
         else:
             self.training_data = dts.load_save_sampled_trajectories(
                 config_data['reaction_network_config']['output_folder']
                 + "/", sample_type="training")
-            self.training_data_cpu_time = dts.load_cpu_time(config_data['reaction_network_config']['output_folder']
-                                                            + "/", training=True)
+#            self.training_data_cpu_time = dts.load_cpu_time(config_data['reaction_network_config']['output_folder']
+#                                                            + "/", training=True)
         if config_data['net_config']['validation_samples_needed'] == "True":
-            start_time = time.time()
+#            start_time = time.time()
             self.valid_data = self.network.generate_sampled_rtc_trajectories(
                 self.config_data['reaction_network_config']['final_time'],
                 self.config_data['reaction_network_config']['num_time_interval'],
                 self.config_data['net_config']['valid_size'])
-            self.validation_data_cpu_time = (time.time() - start_time)
+#            self.validation_data_cpu_time = (time.time() - start_time)
             self.total_num_simulated_trajectories = self.config_data['net_config']['valid_size'] + \
                                                     self.config_data['net_config']['batch_size']
-            print("Time needed to generate validation trajectories: %3u" % (time.time() - start_time))
+#            print("Time needed to generate validation trajectories: %3u" % (time.time() - start_time))
             dts.save_sampled_trajectories(config_data['reaction_network_config']['output_folder'] + "/",
                                           self.training_data,
                                           sample_type="validation")
-            dts.save_cpu_time(config_data['reaction_network_config']['output_folder'] + "/",
-                              self.validation_data_cpu_time, training=False)
+#            dts.save_cpu_time(config_data['reaction_network_config']['output_folder'] + "/",
+#                              self.validation_data_cpu_time, training=False)
         else:
             self.valid_data = dts.load_save_sampled_trajectories(config_data['reaction_network_config']['output_folder']
                                                                  + "/", sample_type="validation")
-            self.validation_data_cpu_time = dts.load_cpu_time(config_data['reaction_network_config']['output_folder']
-                                                            + "/", training=False)
+#            self.validation_data_cpu_time = dts.load_cpu_time(config_data['reaction_network_config']['output_folder']
+#                                                            + "/", training=False)
 
         # set initial values for functions
         times, states_trajectories, martingale_trajectories = self.training_data
