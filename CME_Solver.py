@@ -206,11 +206,11 @@ class FeedForwardSubNet(nn.Module):
         self.final_layer = nn.Linear(num_hiddens, num_reactions * output_function_size)
 
         # Initialize weights and biases
-        #for layer in self.layers:
-        #    nn.init.zeros_(layer.weight)
-        #    nn.init.zeros_(layer.bias)
-        #nn.init.zeros_(self.final_layer.weight)
-        #nn.init.zeros_(self.final_layer.bias)
+        for layer in self.layers:
+            nn.init.zeros_(layer.weight)
+            nn.init.zeros_(layer.bias)
+        nn.init.zeros_(self.final_layer.weight)
+        nn.init.zeros_(self.final_layer.bias)
 
     def forward(self, x, training):
         for layer in self.layers:
