@@ -165,7 +165,6 @@ class ReactionNetworkDefinition(object):
         raise NotImplementedError
 
     def set_propensity_vector(self):
-        @average_timer(5000)
         def func(state_current):
             prop = np.zeros(self.num_reactions)
             for k in range(self.num_reactions):
@@ -443,7 +442,6 @@ class ReactionNetworkDefinition(object):
             unit_poisson_jump_times[next_reaction] += -np.log(np.random.uniform(0, 1))
         return sample_value
 
-    @timer
     def generate_sampled_rtc_trajectory(self, stop_time, num_time_samples, seed=None):
 
         """

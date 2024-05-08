@@ -83,7 +83,7 @@ class CMESolver(object):
             if step % logging_frequency == 0:
                 loss = self.loss_fn(self.valid_data, training=False).numpy()
                 y_init = self.y_init.numpy()
-                elapsed_time = time.time() - start_time + self.validation_data_cpu_time + self.training_data_cpu_time
+                elapsed_time = time.time() - start_time
                 training_history.append([step, loss, elapsed_time])
                 function_value_data.append(y_init)
                 print("step: %5u, loss: %.4e, elapsed time: %3u" % (
@@ -148,6 +148,7 @@ class NonsharedModel(tf.keras.Model):
         batch_size = tf.shape(martingale_trajectories)[0]
         all_one_vec = tf.ones(shape=tf.stack([batch_size, 1]), dtype="float64")
         y = tf.matmul(all_one_vec, self.y_init[None, :])
+        print(states_trajectories)
         for t in range(0, self.num_time_samples - 1):
             time_left = self.stop_time - times[t]
             temporal_dnn = int(t * self.num_temporal_dnns / self.num_time_samples)
@@ -156,6 +157,7 @@ class NonsharedModel(tf.keras.Model):
             features_imag = tf.reshape(
                 tf.tile(tf.sin(self.eigval_imag * time_left + self.eigval_phase), [batch_size, 1]),
                 [batch_size, self.num_exponential_features])
+
             inputs = tf.stack(tf.unstack(states_trajectories[:, t, :], axis=-1)
                               + tf.unstack(features_real, axis=-1) + tf.unstack(features_imag, axis=-1), axis=1)
             z = self.subnet[temporal_dnn](inputs, training)
