@@ -148,7 +148,6 @@ class NonsharedModel(tf.keras.Model):
         batch_size = tf.shape(martingale_trajectories)[0]
         all_one_vec = tf.ones(shape=tf.stack([batch_size, 1]), dtype="float64")
         y = tf.matmul(all_one_vec, self.y_init[None, :])
-        print(states_trajectories)
         for t in range(0, self.num_time_samples - 1):
             time_left = self.stop_time - times[t]
             temporal_dnn = int(t * self.num_temporal_dnns / self.num_time_samples)
