@@ -150,8 +150,8 @@ class NonsharedModel(nn.Module):
         self.eigval_real = nn.Parameter(torch.rand(1, self.num_exponential_features, dtype=torch.float64))
         self.eigval_imag = nn.Parameter(torch.zeros(1, self.num_exponential_features, dtype=torch.float64))
         self.eigval_phase = nn.Parameter(torch.zeros(1, self.num_exponential_features, dtype=torch.float64))
-        self.subnet = [FeedForwardSubNet(self.network.num_reactions, self.network.output_function_size, config_data)
-                       for _ in range(self.num_temporal_dnns)]
+        self.subnet = nn.ModuleList([FeedForwardSubNet(self.network.num_reactions, self.network.output_function_size, config_data)
+                                     for _ in range(self.num_temporal_dnns)])
 
     def forward(self, inputs, training):
         times, states_trajectories, martingale_trajectories = inputs
