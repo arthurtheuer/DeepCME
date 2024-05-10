@@ -7,7 +7,8 @@ from scipy.integrate import odeint
 class independent_birth_death(rxn.ReactionNetworkDefinition):
     """independent birth death network"""
 
-    def __init__(self, num_species):
+    def __init__(self, num_species, RNG):
+        self.rng = RNG
         num_reactions = 2 * num_species
         species_labels = ["X%d" % i for i in range(num_species)]
         output_species_labels = [species_labels[-1]]
@@ -78,7 +79,8 @@ class independent_birth_death(rxn.ReactionNetworkDefinition):
 class linear_signalling_cascade(rxn.ReactionNetworkDefinition):
     """linear signalling cascade network"""
 
-    def __init__(self, num_species):
+    def __init__(self, num_species, RNG):
+        self.rng = RNG
         num_reactions = 2 * num_species
         species_labels = ["X%d" % i for i in range(num_species)]
         output_species_labels = [species_labels[-1]]

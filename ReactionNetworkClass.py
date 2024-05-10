@@ -1,6 +1,7 @@
 import numpy as np
 import math
 import random
+import time
 
 
 def encode(index, sizes):
@@ -400,20 +401,18 @@ class ReactionNetworkDefinition(object):
             unit_poisson_jump_times[next_reaction] += -np.log(np.random.uniform(0, 1))
         return sample_value
 
-    def generate_sampled_rtc_trajectory(self, stop_time, num_time_samples, seed=None):
+    def generate_sampled_rtc_trajectory(self, stop_time, num_time_samples):
 
         """
         Create a uniformly sampled RTC Trajectories.
         """
-        if seed is None:
-            random.seed(seed)
         sampling_times = np.linspace(0, stop_time, num_time_samples)
         states_array = np.zeros([num_time_samples, self.num_species])
         reaction_counts_array = np.zeros([num_time_samples, self.num_reactions])
         compensator_array = np.zeros([num_time_samples, self.num_reactions])
         current_reaction_count = np.zeros(self.num_reactions)
         internal_times = np.zeros(self.num_reactions)
-        unit_poisson_jump_times = -np.log(np.random.uniform(0, 1, self.num_reactions))
+        unit_poisson_jump_times = -np.log(self.rng.uniform(0, 1, self.num_reactions))
         curr_state = self.initial_state
         curr_time = 0
         delta_reactions = np.zeros([self.num_reactions])
@@ -443,89 +442,19 @@ class ReactionNetworkDefinition(object):
             else:
                 curr_state = self.update_state(next_reaction, curr_state)
                 current_reaction_count[next_reaction] += 1
-                unit_poisson_jump_times[next_reaction] += -np.log(np.random.uniform(0, 1))
+                unit_poisson_jump_times[next_reaction] += -np.log(self.rng.uniform(0, 1))
 
-    def generate_sampled_rtc_trajectories(self, stop_time, num_time_samples, num_trajectories=1, seed=None):
+    def generate_sampled_rtc_trajectories(self, stop_time, num_time_samples, num_trajectories=1):
 
         """
         Create several uniformly sampled RTC Trajectories.
         """
-        if seed is None:
-            random.seed(seed)
-
         states_trajectories = np.zeros([num_trajectories, num_time_samples, self.num_species])
         martingale_trajectories = np.zeros([num_trajectories, num_time_samples, self.num_reactions])
         times = np.linspace(0, stop_time, num_time_samples)
         for i in range(num_trajectories):
             times, states_array, reaction_counts_array, compensator_array \
-                = self.generate_sampled_rtc_trajectory(stop_time, num_time_samples, seed)
+                = self.generate_sampled_rtc_trajectory(stop_time, num_time_samples)
             states_trajectories[i, :, :] = states_array
             martingale_trajectories[i, :, :] = reaction_counts_array - compensator_array
         return times, states_trajectories, martingale_trajectories
-
-    # def generate_sampled_rtc_trajectories_random_initial_state(self, stop_time, num_time_samples, num_trajectories=1,
-    #                                                            lambda_array=None, seed=None):
-    #
-    #     """
-    #     Create several uniformly sampled RTC Trajectories.
-    #     """
-    #     if seed is None:
-    #         random.seed(seed)
-    #     if lambda_array is None:
-    #         lambda_array = np.ones(self.num_species) * 10
-    #
-    #     states_trajectories = np.zeros([num_trajectories, num_time_samples, self.num_species])
-    #     martingale_trajectories = np.zeros([num_trajectories, num_time_samples, self.num_reactions])
-    #     times = np.linspace(0, stop_time, num_time_samples)
-    #     for i in range(num_trajectories):
-    #         self.initial_state = generate_random_initial_state(lambda_array)
-    #         times, states_array, reaction_counts_array, compensator_array \
-    #             = self.generate_sampled_rtc_trajectory(stop_time, num_time_samples, seed)
-    #         states_trajectories[i, :, :] = states_array
-    #         martingale_trajectories[i, :, :] = reaction_counts_array - compensator_array
-    #     return times, states_trajectories, martingale_trajectories
-
-    # # noinspection PyAttributeOutsideInit
-    # def set_hist_output_function(self, levels_dict):
-    #     output_function_sizes = [len(levels_dict[key]) + 1 for key in levels_dict.keys()]
-    #     self.output_function_size = np.prod(output_function_sizes)
-    #
-    #     def func(state):
-    #         index_list = []
-    #         for i in range(len(self.output_species_indices)):
-    #             index_list.append(sum([int(state[self.output_species_indices[i]] > k)
-    #                                    for k in levels_dict[self.output_species_labels[i]]]))
-    #
-    #         if tf.executing_eagerly():
-    #             index = np.stack(index_list, axis=0)
-    #             code = np.ravel_multi_index(index, output_function_sizes)
-    #         else:
-    #             T = tf.stack(index_list, axis=0)
-    #             code = encode(T, output_function_sizes)
-    #         return tf.one_hot(code, self.output_function_size, dtype="float64")
-    #
-    #     self.output_function = func
-    #
-    # def set_first_moments_output_function(self):
-    #     self.output_function_size = len(self.output_species_indices)
-    #
-    #     def func(state):
-    #         return tf.stack([state[i] for i in self.output_species_indices])
-    #
-    #     self.output_function = func
-    #
-    # def set_first_and_second_moments_output_function(self):
-    #     n = len(self.output_species_indices)
-    #     self.output_function_size = int(n * (n + 3) / 2)
-    #
-    #     def func(state):
-    #         output_list = [state[i] for i in self.output_species_indices]
-    #         output_list_second_moment = [state[i] ** 2 for i in self.output_species_indices]
-    #         output_list_cross_moments = [state[subset[0]] * state[subset[1]] for subset
-    #                                      in itertools.combinations(self.output_species_indices, 2)]
-    #         for elem in output_list_second_moment + output_list_cross_moments:
-    #             output_list.append(elem)
-    #
-    #         return tf.stack(output_list, axis=0)
-    #
-    #     self.output_function = func

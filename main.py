@@ -9,6 +9,8 @@ import os
 import sys
 import data_saving as dts
 
+import numpy as np
+
 
 def main(argv):
     torch.set_default_dtype(torch.float64)
@@ -18,7 +20,8 @@ def main(argv):
     config_data = json.load(config_file)
     config_file.close()
     # get the network
-    network = getattr(rxn_examples, config_data['reaction_network_config']['reaction_network_name'])(config_data['reaction_network_config']['num_species'])
+    RNG = np.random.default_rng(982358723587511010765893012378091247004)
+    network = getattr(rxn_examples, config_data['reaction_network_config']['reaction_network_name'])(config_data['reaction_network_config']['num_species'], RNG)
     # set up output folder
     results_folder_path = config_data['reaction_network_config']['output_folder'] + "/"
     if not os.path.exists(results_folder_path):
